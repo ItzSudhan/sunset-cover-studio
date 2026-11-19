@@ -1,14 +1,15 @@
 // Staged scenes for deterministic screenshots, set up from the URL:
 //   ?shot=export  shows the exported PNG alone at full size (the very Blob the Download button saves, decoded back);
 //   ?shot=editor  shows the editor with the scene loaded.
-// Scene parameters: photos=chase,street (samples/<name>.jpg), layout, size, grade, title (\n as "|"), tagline,
+// Scene parameters: photos=pier,yacht (samples/<name>.jpg), layout, size, grade, title (\n as "|"), tagline,
 // select (panel index), span=1 (spread the first photo across every panel). window.__shotReady is set when painted.
 import { exportBlob } from './exportPng.js';
 
 export function shotParams(query) {
   return {
     shot: query.get('shot'),
-    photos: (query.get('photos') ?? 'chase,street,heist,boulevard,pier').split(',').filter(Boolean),
+    // Photo order: the first takes the biggest panel. Omitted, all the bundled samples load.
+    photos: query.get('photos')?.split(',').filter(Boolean) ?? null,
     layout: query.get('layout'),
     size: query.get('size'),
     grade: query.get('grade'),
@@ -17,7 +18,9 @@ export function shotParams(query) {
     select: query.has('select') ? Number(query.get('select')) : null,
     span: query.get('span') === '1',
     // crops=photo:zoom:panX:panY,... one per panel, as a user would set them by clicking, dragging and scrolling.
+    // A blank entry keeps that panel's auto-filled face crop.
     crops: query.get('crops')?.split(',').map((c) => {
+      if (!c) return null;
       const [photo, zoom, panX, panY] = c.split(':').map(Number);
       return { photo, zoom, panX, panY, span: false };
     }) ?? null,

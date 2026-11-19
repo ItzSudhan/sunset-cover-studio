@@ -21,12 +21,14 @@
       <h2><span>1</span> Photos</h2>
       <label class="drop">
         <input id="photoInput" type="file" accept="image/*" multiple>
-        <strong>Add photos</strong><small>or drop them anywhere</small>
+        <strong>Add photos</strong><small>pick several at once · they fill the panels in order</small>
       </label>
+      <div class="tray-head"><span>Photo tray</span><span id="trayCount"></span><small>drag onto a panel</small></div>
       <div id="thumbs" class="thumbs"></div>
       <div class="row">
-        <button id="mixAll" type="button" class="ghost">Deal across panels</button>
-        <button id="spreadAll" type="button" class="ghost">Spread one photo</button>
+        <button id="shuffle" type="button" class="ghost hot">Shuffle photos</button>
+        <button id="mixAll" type="button" class="ghost">Deal in order</button>
+        <button id="spreadAll" type="button" class="ghost">Spread one</button>
       </div>
     </section>
 

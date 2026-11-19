@@ -2,9 +2,10 @@
 // to place a photo in it, drag to pan and scroll (or use the slider) to zoom. Download writes the PNG.
 import { GRADES } from './colorGrade.js';
 import { downloadPng } from './exportPng.js';
-import { SIZES, TEMPLATES, layoutSpec, panelCount, pointInPolygon } from './layouts.js';
-import { clampPanel, defaultPanel, panelFit } from './photoPanels.js';
+import { SIZES, TEMPLATES, computeLayout, layoutSpec, panelCount, pointInPolygon } from './layouts.js';
+import { clampPanel, defaultPanel, focusCrop, overlap, panelArea, panelFit } from './photoPanels.js';
 import { renderCover } from './renderCover.js';
+import { DEFAULT_FOCUS, SAMPLES, sampleFocus } from './samples.js';
 import { exposeExport, markReady, shotParams, stageExport } from './shots.js';
 
 const $ = (id) => document.getElementById(id);
@@ -13,8 +14,9 @@ const wrap = $('previewWrap');
 
 const state = {
   photos: [],
+  order: [],
   panels: [],
-  layout: 'heist',
+  layout: 'lineup',
   size: 'landscape',
   grade: 'sunset',
   intensity: 1,
@@ -26,24 +28,66 @@ let selected = 0;
 let layout = null;
 let queued = false;
 
-/** Gives every panel a fresh starting crop for the photos now loaded. */
+/** The panels of the current layout at export size, so crops are worked out at full resolution. */
+function exportLayout() {
+  const size = SIZES[state.size], s = Math.min(size.w, size.h);
+  return { size, ...computeLayout(layoutSpec(state.layout, state.size), size.w, size.h, s * 0.024, s * 0.016) };
+}
+
+/**
+ * Deals the photos onto the panels: photos in `state.order` go to panels from the most visible (the hero) to the
+ * least, where "visible" is the panel's area minus what the title covers, so the hero never hides under the lettering.
+ * Each is cropped tight on its face. With fewer photos than panels they repeat, zoomed closer so no two panels match.
+ */
 function autoFill() {
-  state.panels = Array.from({ length: 8 }, (_, i) => defaultPanel(i, state.photos.length));
+  const n = state.photos.length;
+  state.panels = Array.from({ length: 12 }, (_, i) => defaultPanel(i, n));
+  if (n <= 1) return;
+  const { size, panels, title } = exportLayout();
+  const visible = (p) => { const o = overlap(p, title); return panelArea(p) * (1 - o.x * o.y); };
+  const rank = panels.map((p, i) => [i, visible(p)]).sort((a, b) => b[1] - a[1]).map(([i]) => i);
+  rank.forEach((pi, k) => {
+    const photo = state.photos[state.order[k % n]];
+    const zoom = k === 0 ? 1.08 : k < n ? 1.3 : 1.9;
+    state.panels[pi] = focusCrop(photo, panels[pi], zoom, size.w, size.h, title);
+  });
+}
+
+/** Puts photo `i` in panel `pi`, cropped on its face. */
+function placePhoto(i, pi) {
+  const { size, panels, title } = exportLayout();
+  if (!panels[pi]) return;
+  state.panels[pi] = focusCrop(state.photos[i], panels[pi], 1.2, size.w, size.h, title);
 }
 
 function loadBitmap(src) {
   return fetch(src).then((r) => r.blob()).then((b) => createImageBitmap(b));
 }
 
+function setPhotos(photos) {
+  state.photos = photos.map((p, index) => ({ ...p, index }));
+  state.order = state.photos.map((_, i) => i);
+}
+
 async function addFiles(files) {
   const images = [...files].filter((f) => f.type.startsWith('image/'));
   if (!images.length) return;
   const fresh = state.photos.every((p) => p.sample);
-  const loaded = await Promise.all(images.map(async (f) => ({ img: await createImageBitmap(f), name: f.name, sample: false })));
-  state.photos = fresh ? loaded : [...state.photos, ...loaded];
+  const loaded = await Promise.all(images.map(async (f) => ({ img: await createImageBitmap(f), name: f.name, sample: false, focus: DEFAULT_FOCUS })));
+  setPhotos(fresh ? loaded : [...state.photos, ...loaded]);
   autoFill();
-  status(`${loaded.length} photo${loaded.length > 1 ? 's' : ''} added and spread over the panels.`);
+  status(`${loaded.length} photo${loaded.length > 1 ? 's' : ''} added: the first is the hero, the rest fill the panels in order.`);
   refreshAll();
+}
+
+/** Re-deals the photos in a new random order (the hero changes too). */
+function shuffle() {
+  const o = state.order;
+  for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; }
+  autoFill();
+  status(`Shuffled: ${state.photos[o[0]].name.replace(/\.\w+$/, '')} is the hero now.`);
+  refreshPanelControls();
+  redraw();
 }
 
 function status(text) { $('status').textContent = text; }
@@ -125,6 +169,26 @@ preview.addEventListener('pointermove', (e) => {
 const endDrag = () => { drag = null; };
 preview.addEventListener('pointerup', endDrag);
 preview.addEventListener('pointercancel', endDrag);
+// Drag a tray thumbnail onto a panel to put that photo there.
+const PHOTO_TYPE = 'application/x-cover-photo';
+preview.addEventListener('dragover', (e) => {
+  if (!e.dataTransfer.types.includes(PHOTO_TYPE)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+  const i = hitPanel(e);
+  if (i >= 0 && i !== selected) { selected = i; refreshPanelControls(); redraw(); }
+});
+preview.addEventListener('drop', (e) => {
+  if (!e.dataTransfer.types.includes(PHOTO_TYPE)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const i = hitPanel(e);
+  if (i < 0) return;
+  selected = i;
+  placePhoto(Number(e.dataTransfer.getData(PHOTO_TYPE)), i);
+  refreshPanelControls();
+  redraw();
+});
 preview.addEventListener('wheel', (e) => {
   const i = hitPanel(e);
   if (i < 0) return;
@@ -153,9 +217,9 @@ function chips(container, entries, current, onPick, render) {
 
 function refreshChips() {
   chips($('layouts'), Object.entries(TEMPLATES).map(([id, t]) => [id, `${t.name} · ${panelCount(layoutSpec(id, state.size))}`]),
-    state.layout, (id) => { state.layout = id; selected = 0; refreshAll(); });
+    state.layout, (id) => { state.layout = id; selected = 0; autoFill(); refreshAll(); });
   chips($('sizes'), Object.values(SIZES).map((s) => [s.id, s.label]), state.size,
-    (id) => { state.size = id; selected = 0; refreshAll(); });
+    (id) => { state.size = id; selected = 0; autoFill(); refreshAll(); });
   chips($('grades'), Object.entries(GRADES).map(([id, g]) => [id, g.name]), state.grade,
     (id) => { state.grade = id; refreshAll(); },
     (b, id) => {
@@ -169,18 +233,30 @@ function refreshChips() {
 
 function refreshThumbs() {
   const set = state.panels[selected];
+  const n = layout ? layout.panels.length : 0;
+  const used = new Set(state.panels.slice(0, n).map((p) => p.photo));
+  $('trayCount').textContent = `${state.photos.length} photo${state.photos.length === 1 ? '' : 's'}`;
   $('thumbs').replaceChildren(...state.photos.map((p, i) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'thumb' + (set && set.photo === i ? ' on' : '');
-    b.title = `Put ${p.name} in panel ${selected + 1}`;
+    b.className = 'thumb' + (set && set.photo === i ? ' on' : '') + (used.has(i) ? ' used' : '');
+    b.title = `Drag ${p.name} onto a panel, or click to put it in panel ${selected + 1}`;
+    b.draggable = true;
     const c = document.createElement('canvas');
-    c.width = 96; c.height = 64;
-    const k = Math.max(96 / p.img.width, 64 / p.img.height);
-    c.getContext('2d').drawImage(p.img, (96 - p.img.width * k) / 2, (64 - p.img.height * k) / 2, p.img.width * k, p.img.height * k);
+    c.width = 120; c.height = 120;
+    const k = Math.max(120 / p.img.width, 120 / p.img.height);
+    const dw = p.img.width * k, dh = p.img.height * k;
+    // Thumbnails are cropped square around the face, like the panels.
+    const x = Math.min(0, Math.max(120 - dw, 60 - p.focus[0] * dw)), y = Math.min(0, Math.max(120 - dh, 48 - p.focus[1] * dh));
+    c.getContext('2d').drawImage(p.img, x, y, dw, dh);
     b.append(c);
+    b.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData(PHOTO_TYPE, String(i));
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setDragImage(c, 30, 30);
+    });
     b.addEventListener('click', () => {
-      Object.assign(state.panels[selected], { photo: i, zoom: 1.05, panX: 0, panY: 0 });
+      placePhoto(i, selected);
       refreshPanelControls();
       redraw();
     });
@@ -206,7 +282,11 @@ function refreshAll() {
 }
 
 $('photoInput').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
-window.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('dropping'); });
+window.addEventListener('dragover', (e) => {
+  if (!e.dataTransfer.types.includes('Files')) return;
+  e.preventDefault();
+  document.body.classList.add('dropping');
+});
 window.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dropping'); });
 window.addEventListener('drop', (e) => {
   e.preventDefault();
@@ -228,7 +308,14 @@ $('spreadAll').addEventListener('click', () => {
   refreshPanelControls();
   redraw();
 });
-$('mixAll').addEventListener('click', () => { autoFill(); status('Photos re-dealt across the panels.'); refreshPanelControls(); redraw(); });
+$('mixAll').addEventListener('click', () => {
+  state.order = state.photos.map((_, i) => i);
+  autoFill();
+  status('Photos dealt in order: the first is the hero, the rest fill the panels.');
+  refreshPanelControls();
+  redraw();
+});
+$('shuffle').addEventListener('click', shuffle);
 $('resetPanel').addEventListener('click', () => {
   Object.assign(state.panels[selected], { zoom: 1, panX: 0, panY: 0 });
   refreshPanelControls();
@@ -253,13 +340,17 @@ window.addEventListener('resize', () => {
 
 async function start() {
   const params = shotParams(new URLSearchParams(location.search));
-  const names = params.shot ? params.photos : ['chase', 'street', 'heist', 'boulevard', 'pier'];
-  state.photos = await Promise.all(names.map(async (n) => ({ img: await loadBitmap(`samples/${n}.jpg`), name: `${n}.jpg`, sample: true })));
-  autoFill();
+  const names = params.photos ?? SAMPLES.map((s) => s.name);
+  setPhotos(await Promise.all(names.map(async (n) => ({
+    img: await loadBitmap(`samples/${n}.jpg`), name: `${n}.jpg`, sample: true, focus: sampleFocus(n),
+  }))));
   if (params.shot) {
     for (const k of ['layout', 'size', 'grade', 'title', 'tagline']) if (params[k] != null) state[k] = params[k];
+  }
+  autoFill();
+  if (params.shot) {
     if (params.select != null) selected = params.select;
-    if (params.crops) params.crops.forEach((c, i) => { state.panels[i] = c; });
+    if (params.crops) params.crops.forEach((c, i) => { if (c) state.panels[i] = c; });
     if (params.fx != null) for (const k of Object.keys(state.fx)) state.fx[k] = params.fx.includes(k);
     if (params.span) state.panels.forEach((p) => Object.assign(p, { photo: 0, zoom: 1, panX: 0, panY: 0, span: true }));
     $('title').value = state.title;
@@ -271,7 +362,7 @@ async function start() {
     await stageExport(state);
   } else {
     refreshAll();
-    if (!params.shot) status('Sample photos loaded. Add your own to replace them.');
+    if (!params.shot) status(`${state.photos.length} sample photos loaded. Add your own (several at once) to replace them.`);
   }
   markReady();
 }

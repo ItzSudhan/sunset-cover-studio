@@ -6,7 +6,8 @@
 // and halftone, and hand-drawn path lettering with gradient fill, outline, extrusion and shadow, exported as a PNG in
 // 1920x1080, 1080x1080 or 1080x1350. This program hands it in: it copies app/ and screenshots/ from beside this file
 // to /output and writes /output/dossier.json, the summary the judge reads, with the vendored make.fun library.
-// The sample photos in app/samples/ are free to use (made for make.fun, and renders of our own original game).
+// The sample photos in app/samples/ are free to use: AI-generated photos of fictional people, made for this entry,
+// plus the starter's own boulevard and pier shots. Add several photos at once and they fill the panels, hero first.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:

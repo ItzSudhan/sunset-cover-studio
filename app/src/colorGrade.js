@@ -204,9 +204,10 @@ export function drawPalms(ctx, w, h, grade) {
   ctx.shadowColor = 'rgba(0,0,0,0.5)';
   ctx.shadowBlur = s * 0.01;
   const k = w > h * 1.2 ? 1 : 0.78;
-  drawPalm(ctx, w * 0.03, h + s * 0.02, s * 0.6 * k, 0.14, grade.palm);
-  drawPalm(ctx, w * 0.085, h + s * 0.02, s * 0.42 * k, 0.24, grade.palm);
-  drawPalm(ctx, w * 0.98, h + s * 0.02, s * 0.5 * k, -0.18, grade.palm);
+  // Kept low and leaning outward so they frame the corners without hiding the faces in the edge panels.
+  drawPalm(ctx, w * 0.012, h + s * 0.02, s * 0.44 * k, 0.05, grade.palm);
+  drawPalm(ctx, w * 0.05, h + s * 0.02, s * 0.3 * k, 0.12, grade.palm);
+  drawPalm(ctx, w * 0.992, h + s * 0.02, s * 0.36 * k, -0.06, grade.palm);
   ctx.restore();
 }
 

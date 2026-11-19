@@ -12,6 +12,41 @@ export function defaultPanel(i, count) {
   return { photo: i % count, zoom: 1.25 + (i % 3) * 0.15, panX: 0, panY: 0.45, span: false };
 }
 
+/** A panel polygon's area in pixels (shoelace formula), used to rank panels from hero to smallest. */
+export function panelArea(panel) {
+  let a = 0;
+  panel.poly.forEach((p, i) => { const q = panel.poly[(i + 1) % panel.poly.length]; a += p[0] * q[1] - q[0] * p[1]; });
+  return Math.abs(a) / 2;
+}
+
+/** The fraction of a panel's bounding box that a rectangle (the title box) covers, per axis. */
+export function overlap(panel, rect) {
+  const b = panel.bbox;
+  const ix = Math.max(0, Math.min(b.x + b.w, rect.x + rect.w) - Math.max(b.x, rect.x));
+  const iy = Math.max(0, Math.min(b.y + b.h, rect.y + rect.h) - Math.max(b.y, rect.y));
+  return { x: ix / b.w, y: iy / b.h };
+}
+
+/**
+ * A crop that puts the photo's focus point (a face) at the panel's horizontal centre and a third of the way down,
+ * at the given zoom. When the title box (`avoid`) covers the lower part of the panel, the face goes higher, into the
+ * part left clear. Pans are clamped, so a face near a photo's edge lands as close as the photo allows.
+ */
+export function focusCrop(photo, panel, zoom, w, h, avoid = null) {
+  const set = { photo: photo.index, zoom, panX: 0, panY: 0, span: false };
+  const f = panelFit(photo.img, panel, set, w, h);
+  const [fx, fy] = photo.focus;
+  let ty = 0.34;
+  if (avoid && overlap(panel, avoid).x > 0.3 && avoid.y > f.box.y) {
+    const free = (avoid.y - f.box.y) / f.box.h;
+    if (free >= 0.22 && free < 0.9) ty = Math.min(0.34, free * 0.5);
+  }
+  if (f.ox > 0.5) set.panX = (f.box.w * 0.5 - fx * f.dw + f.ox) / f.ox;
+  if (f.oy > 0.5) set.panY = (f.box.h * ty - fy * f.dh + f.oy) / f.oy;
+  clampPanel(set);
+  return set;
+}
+
 /** Where a photo lands for a panel: the fitted box, the drawn size and the room it has to pan in each axis. */
 export function panelFit(img, panel, set, w, h) {
   const box = set.span ? { x: 0, y: 0, w, h } : panel.bbox;

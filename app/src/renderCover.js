@@ -88,7 +88,8 @@ export function renderCover(canvas, state) {
   drawBloom(ctx, layer, w, h, 0.32);
   drawLightLeak(ctx, w, h, grade);
   const t = layout.title;
-  if (state.fx.sun) drawSun(ctx, t.x + t.w * (t.align === 'center' ? 0.5 : 0.66), t.y + t.h * 0.1, t.h * 0.55, grade);
+  // The sun sits low behind the lettering, so it frames the title without covering a face.
+  if (state.fx.sun) drawSun(ctx, t.x + t.w * (t.align === 'center' ? 0.5 : 0.66), t.y + t.h * 0.32, t.h * 0.5, grade);
   if (state.fx.halftone) drawHalftone(ctx, w, h, Math.max(4, s * 0.0085), 0.38);
 
   // 3. Frames, palms, vignette.

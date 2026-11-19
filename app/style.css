@@ -31,10 +31,15 @@ h2 span { display: inline-grid; place-items: center; width: 18px; height: 18px; 
 .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .drop strong { font-size: 14px; }
 .drop small { color: var(--dim); font-size: 11px; }
-.thumbs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 8px 0; }
-.thumb { padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: #000; cursor: pointer; }
+.tray-head { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 6px; font-size: 12px; font-weight: 700; }
+.tray-head #trayCount { color: var(--sun); }
+.tray-head small { margin-left: auto; color: var(--dim); font-weight: 400; }
+.thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0 0 8px; }
+.thumb { position: relative; padding: 0; border: 2px solid #2c1b44; border-radius: 7px; overflow: hidden; background: #000; cursor: grab; opacity: 0.6; }
 .thumb canvas { display: block; width: 100%; height: auto; }
-.thumb.on { border-color: var(--teal); }
+.thumb.used { opacity: 1; }
+.thumb.on { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(61, 242, 255, 0.35); }
+button.ghost.hot { border-color: var(--hot); color: #fff; font-weight: 700; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .chip { font: inherit; font-size: 12px; color: var(--ink); background: #22143a; border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
