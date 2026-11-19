@@ -8,7 +8,8 @@ export function defaultPanel(i, count) {
     const pans = [[0, 0], [-0.7, -0.4], [0.6, 0.3], [0.8, -0.6], [-0.5, 0.6], [0.2, -0.2], [-0.9, 0.1], [0.5, 0.8]];
     return { photo: 0, zoom: zooms[i % 8], panX: pans[i % 8][0], panY: pans[i % 8][1], span: false };
   }
-  return { photo: i % count, zoom: 1.05, panX: 0, panY: 0, span: false };
+  // Several photos: deal them round the panels, zoomed in a little and favouring the top (where faces usually are).
+  return { photo: i % count, zoom: 1.25 + (i % 3) * 0.15, panX: 0, panY: 0.45, span: false };
 }
 
 /** Where a photo lands for a panel: the fitted box, the drawn size and the room it has to pan in each axis. */

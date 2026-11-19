@@ -148,6 +148,16 @@ export function drawTitle(ctx, lines, box, style) {
   ctx.miterLimit = 2.2;
   const outerW = weight + 2 * (style.outlineW ?? 0);
 
+  if (style.glow) {
+    // A wide soft halo in the grade's glow colour, so the title lifts off busy photos.
+    ctx.save();
+    ctx.shadowColor = style.glow;
+    ctx.shadowBlur = u * 6;
+    ctx.strokeStyle = style.glow;
+    ctx.lineWidth = outerW + 1.2;
+    for (const p of paths) ctx.stroke(p.path);
+    ctx.restore();
+  }
   if (style.extrude) {
     const [dx, dy] = style.depth ?? [0.5, 0.8];
     const steps = 14;

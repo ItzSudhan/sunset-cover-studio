@@ -38,6 +38,18 @@ export async function stageExport(state) {
   document.body.append(canvas);
 }
 
+/** Lets a test harness fetch the exported PNG (the Download button's Blob) as a data URL. */
+export function exposeExport(state) {
+  window.__exportDataUrl = async (sizeId) => {
+    const { blob } = await exportBlob(state, sizeId ?? state.size);
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  };
+}
+
 export function markReady() {
   requestAnimationFrame(() => requestAnimationFrame(() => { window.__shotReady = true; }));
 }

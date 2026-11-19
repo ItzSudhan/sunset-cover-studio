@@ -28,7 +28,7 @@ export const TEMPLATES = {
     portrait: {
       dir: 'rows', cuts: [[0.26, 0.21], [0.50, 0.45]],
       sub: [[[0.60, 0.40]], [[0.24, 0.42], [0.78, 0.58]], []],
-      title: { x: 0.04, y: 0.60, w: 0.92, h: 0.25, align: 'center' },
+      title: { x: 0.04, y: 0.63, w: 0.92, h: 0.24, align: 'center' },
     },
   },
   crossfire: {

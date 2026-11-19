@@ -31,7 +31,7 @@ h2 span { display: inline-grid; place-items: center; width: 18px; height: 18px; 
 .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .drop strong { font-size: 14px; }
 .drop small { color: var(--dim); font-size: 11px; }
-.thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; }
+.thumbs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 8px 0; }
 .thumb { padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: #000; cursor: pointer; }
 .thumb canvas { display: block; width: 100%; height: auto; }
 .thumb.on { border-color: var(--teal); }

@@ -5,7 +5,7 @@ import { downloadPng } from './exportPng.js';
 import { SIZES, TEMPLATES, layoutSpec, panelCount, pointInPolygon } from './layouts.js';
 import { clampPanel, defaultPanel, panelFit } from './photoPanels.js';
 import { renderCover } from './renderCover.js';
-import { markReady, shotParams, stageExport } from './shots.js';
+import { exposeExport, markReady, shotParams, stageExport } from './shots.js';
 
 const $ = (id) => document.getElementById(id);
 const preview = $('preview');
@@ -243,7 +243,11 @@ $('downloadAll').addEventListener('click', async () => {
   for (const id of Object.keys(SIZES)) names.push(await downloadPng(state, id));
   status(`Saved ${names.join(', ')}`);
 });
-window.addEventListener('resize', () => { fitPreview(); redraw(); });
+window.addEventListener('resize', () => {
+  if (document.body.classList.contains('stage')) return;
+  fitPreview();
+  redraw();
+});
 
 // ---- Start: sample photos (or a staged screenshot scene) -------------------------------------------------------
 
@@ -260,8 +264,10 @@ async function start() {
     if (params.span) state.panels.forEach((p) => Object.assign(p, { photo: 0, zoom: 1, panX: 0, panY: 0, span: true }));
     $('title').value = state.title;
     $('tagline').value = state.tagline;
+    exposeExport(state);
   }
   if (params.shot === 'export') {
+    document.body.classList.add('stage');
     await stageExport(state);
   } else {
     refreshAll();

@@ -10,7 +10,7 @@ function titleStyle(grade) {
   return {
     weight: 1.75, track: 0.5, skew: 0.17, lead: 1.4, fill: grade.fill,
     outline: grade.outline, outlineW: 0.62, ring: grade.ring, ringW: 0.2,
-    extrude: grade.extrude, depth: [0.55, 1.15], shadow: 'rgba(0,0,0,0.7)',
+    extrude: grade.extrude, depth: [0.55, 1.15], shadow: 'rgba(0,0,0,0.7)', glow: grade.glow,
   };
 }
 

@@ -12,13 +12,25 @@
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-app.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+
+// Sanity check: the app's entry page and its modules are in place, and the screenshots fit the scorer's caps
+// (3 or 4 images, each at most 256 KiB). A problem is reported, not fatal, so the hand-in still happens.
+for (const file of ['index.html', 'src/editor.js', 'src/renderCover.js', 'src/lettering.js']) {
+  if (!existsSync(join(here, 'app', file))) console.warn(`main.ts: app/${file} is missing`);
+}
+const shotDir = join(here, 'screenshots');
+const shots = existsSync(shotDir) ? readdirSync(shotDir).filter((f) => /\.(png|jpe?g)$/i.test(f)).sort() : [];
+if (shots.length < 3 || shots.length > 4) console.warn(`main.ts: expected 3 or 4 screenshots, found ${shots.length}`);
+for (const f of shots) {
+  if (statSync(join(shotDir, f)).size > 262144) console.warn(`main.ts: screenshots/${f} is over 256 KiB`);
+}
 
 mkdirSync(out, { recursive: true });
 cpSync(join(here, 'app'), join(out, 'app'), { recursive: true });

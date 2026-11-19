@@ -31,13 +31,24 @@
     </section>
 
     <section>
-      <h2><span>2</span> Layout &amp; size</h2>
+      <h2><span>2</span> Caption</h2>
+      <label class="field">Title <small>(Enter for a new line)</small>
+        <textarea id="title" rows="2" maxlength="40">Sunset
+Streets</textarea>
+      </label>
+      <label class="field">Tagline
+        <input id="tagline" type="text" maxlength="48" value="Coming this summer">
+      </label>
+    </section>
+
+    <section>
+      <h2><span>3</span> Layout &amp; size</h2>
       <div id="layouts" class="chips"></div>
       <div id="sizes" class="chips sizes"></div>
     </section>
 
     <section>
-      <h2><span>3</span> Colour grade</h2>
+      <h2><span>4</span> Colour grade</h2>
       <div id="grades" class="chips grades"></div>
       <label class="slider">Grade strength <input id="intensity" type="range" min="0" max="1" step="0.01" value="1"></label>
       <div class="toggles">
@@ -47,24 +58,13 @@
         <label><input id="fx-grain" type="checkbox" checked> Grain</label>
       </div>
     </section>
-
-    <section>
-      <h2><span>4</span> Caption</h2>
-      <label class="field">Title <small>(Enter for a new line)</small>
-        <textarea id="title" rows="2" maxlength="40">Sunset
-Streets</textarea>
-      </label>
-      <label class="field">Tagline
-        <input id="tagline" type="text" maxlength="48" value="Coming this summer">
-      </label>
-    </section>
   </aside>
 
   <main class="stagearea">
     <div class="toolbar">
       <strong id="panelLabel">Panel 1</strong>
       <label class="slider inline">Zoom <input id="zoom" type="range" min="1" max="4" step="0.01" value="1"></label>
-      <label class="check"><input id="span" type="checkbox"> Span poster</label>
+      <label class="check"><input id="span" type="checkbox"> Span whole poster</label>
       <button id="resetPanel" type="button" class="ghost">Reset crop</button>
       <span class="grow"></span>
       <button id="downloadAll" type="button" class="ghost">All 3 sizes</button>
