@@ -1,9 +1,39 @@
 // Composes the poster onto a canvas at the canvas's own size. The live preview and the exported PNG both come from
 // this one function, so what you see is what you download.
 import { GRADES, applyGradientMap, drawBloom, drawGrain, drawHalftone, drawLightLeak, drawPalms, drawSun, drawVignette } from './colorGrade.js';
-import { computeLayout, layoutSpec } from './layouts.js';
+import { posterLayout } from './layouts.js';
 import { drawTitle } from './lettering.js';
 import { defaultPanel, drawPanelFrames, drawPanelPhoto } from './photoPanels.js';
+
+export const DEFAULT_CREDITS = 'A Sunset Cover Studio picture · starring the whole crew\nMusic by Night Drive Radio · written & directed by you · coming soon';
+
+/**
+ * The billing block in the strip under the panels: up to two lines of tall, condensed capitals (a system sans
+ * squeezed sideways, so no font file is needed), centred and sized to fit the strip.
+ */
+function drawCredits(ctx, text, foot, s, grade) {
+  const lines = text.toUpperCase().split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 2);
+  if (!lines.length || foot.h < 6) return;
+  const size = foot.h * (lines.length > 1 ? 0.36 : 0.52);
+  ctx.save();
+  ctx.font = `600 ${size}px "Helvetica Neue", Arial, sans-serif`;
+  ctx.letterSpacing = `${(size * 0.1).toFixed(1)}px`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = grade.border;
+  ctx.globalAlpha = 0.86;
+  const widest = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const squeeze = Math.min(0.66, (foot.w * 0.92) / widest);
+  lines.forEach((line, i) => {
+    const y = foot.y + foot.h * (lines.length > 1 ? 0.3 + i * 0.42 : 0.52);
+    ctx.save();
+    ctx.translate(foot.x + foot.w / 2, y);
+    ctx.scale(squeeze, 1);
+    ctx.fillText(line, 0, 0);
+    ctx.restore();
+  });
+  ctx.restore();
+}
 
 /** Title and tagline lettering styles for a grade. */
 function titleStyle(grade) {
@@ -57,6 +87,22 @@ function drawTagline(ctx, text, at, maxW, s, grade) {
 }
 
 /**
+ * The rectangle the caption actually covers (the title's ink plus the tagline plate under it), measured with a dry
+ * run of the same lettering code, for auto-fill to keep faces out of. Narrow titles leave room for faces beside them.
+ */
+export function titleKeepOut(state, layout, w, h) {
+  const s = Math.min(w, h), t = layout.title;
+  const ctx = new OffscreenCanvas(8, 8).getContext('2d');
+  const ink = drawTitle(ctx, state.title.split('\n').slice(0, 3), t, { ...titleStyle(GRADES.sunset), align: t.align, dryRun: true });
+  if (!ink) return null;
+  const pad = s * 0.014, slant = ink.h * 0.17;
+  return {
+    x: ink.x - pad - slant, y: ink.y - pad, w: ink.w + pad * 2 + slant * 2,
+    h: ink.h + pad * 2 + (state.tagline.trim() ? s * 0.105 : 0), weight: 1,
+  };
+}
+
+/**
  * Renders `state` onto `canvas` and returns the layout (panel polygons in canvas pixels) for hit testing.
  * state: { photos: [{img}], panels: [{photo, zoom, panX, panY, span}], layout, size, grade, intensity,
  *          title, tagline, fx: {sun, palms, grain, halftone} }
@@ -64,15 +110,12 @@ function drawTagline(ctx, text, at, maxW, s, grade) {
 export function renderCover(canvas, state) {
   const w = canvas.width, h = canvas.height, s = Math.min(w, h);
   const grade = GRADES[state.grade] ?? GRADES.sunset;
-  const layout = computeLayout(layoutSpec(state.layout, state.size), w, h, s * 0.024, s * 0.016);
+  const layout = posterLayout(state.layout, state.size, w, h, state.fx);
 
-  // 1. Photos in their panels on a dark ground, then the gradient-map grade over the lot.
+  // 1. Photos in their panels on a black ground (the thin black gutters), then the grade over the lot.
   const layer = new OffscreenCanvas(w, h);
   const lc = layer.getContext('2d', { willReadFrequently: true });
-  const ground = lc.createLinearGradient(0, 0, w, h);
-  ground.addColorStop(0, '#1a1a1a');
-  ground.addColorStop(1, '#000000');
-  lc.fillStyle = ground;
+  lc.fillStyle = '#000';
   lc.fillRect(0, 0, w, h);
   layout.panels.forEach((panel, i) => {
     const set = state.panels[i] ?? defaultPanel(i, state.photos.length);
@@ -85,17 +128,18 @@ export function renderCover(canvas, state) {
   ctx.save();
   ctx.clearRect(0, 0, w, h);
   ctx.drawImage(layer, 0, 0);
-  drawBloom(ctx, layer, w, h, 0.32);
+  drawBloom(ctx, layer, w, h, 0.28);
   drawLightLeak(ctx, w, h, grade);
   const t = layout.title;
-  // The sun sits low behind the lettering, so it frames the title without covering a face.
-  if (state.fx.sun) drawSun(ctx, t.x + t.w * (t.align === 'center' ? 0.5 : 0.66), t.y + t.h * 0.32, t.h * 0.5, grade);
-  if (state.fx.halftone) drawHalftone(ctx, w, h, Math.max(4, s * 0.0085), 0.38);
+  // The sun sits right behind the lettering (auto-fill keeps faces out of its disc), so it frames the title.
+  if (state.fx.sun) drawSun(ctx, layout.sun.cx, layout.sun.cy, layout.sun.r, grade);
+  if (state.fx.halftone) drawHalftone(ctx, w, h, Math.max(4, s * 0.0085), 0.3);
 
-  // 3. Frames, palms, vignette.
+  // 3. Frames, palms, vignette, then the credits strip along the bottom.
   drawPanelFrames(ctx, layout.panels, grade, s);
   if (state.fx.palms) drawPalms(ctx, w, h, grade);
-  drawVignette(ctx, w, h, 0.5);
+  drawVignette(ctx, w, h, 0.42);
+  drawCredits(ctx, state.credits ?? DEFAULT_CREDITS, layout.foot, s, grade);
 
   // 4. Lettering: the title, then the tagline plate under it.
   const lines = state.title.split('\n').slice(0, 3);

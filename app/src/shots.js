@@ -1,7 +1,7 @@
 // Staged scenes for deterministic screenshots, set up from the URL:
 //   ?shot=export  shows the exported PNG alone at full size (the very Blob the Download button saves, decoded back);
 //   ?shot=editor  shows the editor with the scene loaded.
-// Scene parameters: photos=pier,yacht (samples/<name>.jpg), layout, size, grade, title (\n as "|"), tagline,
+// Scene parameters: photos=pier,yacht (samples/<name>.jpg), layout, size, grade, title (\n as "|"), tagline, credits,
 // select (panel index), span=1 (spread the first photo across every panel). window.__shotReady is set when painted.
 import { exportBlob } from './exportPng.js';
 
@@ -15,6 +15,7 @@ export function shotParams(query) {
     grade: query.get('grade'),
     title: query.get('title')?.replace(/\|/g, '\n'),
     tagline: query.get('tagline'),
+    credits: query.get('credits')?.replace(/\|/g, '\n'),
     select: query.has('select') ? Number(query.get('select')) : null,
     span: query.get('span') === '1',
     // crops=photo:zoom:panX:panY,... one per panel, as a user would set them by clicking, dragging and scrolling.

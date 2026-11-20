@@ -18,7 +18,7 @@ export const TEMPLATES = {
     landscape: {
       dir: 'cols', cuts: [[0.25, 0.19], [0.60, 0.54], [0.81, 0.76]],
       sub: [[[0.36, 0.31], [0.68, 0.63]], [], [[0.52, 0.44]], [[0.34, 0.29], [0.67, 0.61]]],
-      title: { x: 0.18, y: 0.62, w: 0.64, h: 0.26, align: 'center' },
+      title: { x: 0.16, y: 0.565, w: 0.68, h: 0.31, align: 'center' },
     },
     square: {
       dir: 'rows', cuts: [[0.28, 0.23], [0.66, 0.60]],
@@ -139,10 +139,37 @@ export function insetPolygon(poly, d) {
 }
 
 /**
- * Lays out a spec on a w x h canvas: returns { panels: [{ poly, bbox }], title: {x, y, w, h, align} } in pixels.
- * `margin` is the outer frame and `gutter` the gap between panels, both in pixels.
+ * The full poster layout for a template and size on a w x h canvas: the panels, the title box, a credits strip
+ * along the bottom (`foot`), where the sun disc sits (centred behind the lettering, so it frames the title and
+ * never floats over a panel on its own) and the `keepOut` rectangles faces must stay clear of: the title block with
+ * its tagline, the sun disc and, when palms are on, the palm crowns in the bottom corners. Rendering and auto-fill
+ * both use this, so crops are always worked out against what is actually drawn.
  */
-export function computeLayout(spec, w, h, margin, gutter) {
+export function posterLayout(templateId, sizeId, w, h, fx = { sun: true, palms: true }) {
+  const s = Math.min(w, h);
+  const L = computeLayout(layoutSpec(templateId, sizeId), w, h, s * 0.018, s * 0.01, s * 0.052);
+  const t = L.title;
+  // The title plus its tagline plate (about 0.105 s under the lettering) must end above the credits strip: lift the
+  // box by half of any overrun and shrink it by the other half.
+  const over = t.y + t.h + s * 0.105 - L.foot.y;
+  if (over > 0) { t.y -= over / 2; t.h -= over / 2; }
+  L.sun = { cx: t.x + t.w * (t.align === 'center' ? 0.5 : 0.6), cy: t.y + t.h * 0.44, r: t.h * 0.64 };
+  L.keepOut = [{ x: t.x, y: t.y - s * 0.01, w: t.w, h: t.h + s * 0.11, weight: 1 }];
+  if (fx.sun) L.keepOut.push({ x: L.sun.cx - L.sun.r, y: L.sun.cy - L.sun.r, w: L.sun.r * 2, h: L.sun.r * 2, weight: 1 });
+  if (fx.palms) {
+    const k = w > h * 1.2 ? 1 : 0.78;
+    L.keepOut.push({ x: 0, y: h - s * 0.62 * k, w: s * 0.24 * k, h: s * 0.62 * k, weight: 0.6 });
+    L.keepOut.push({ x: w - s * 0.2 * k, y: h - s * 0.5 * k, w: s * 0.2 * k, h: s * 0.5 * k, weight: 0.6 });
+  }
+  return L;
+}
+
+/**
+ * Lays out a spec on a w x h canvas: returns { panels: [{ poly, bbox }], title: {x, y, w, h, align}, foot } in
+ * pixels. `margin` is the outer frame, `gutter` the gap between panels and `foot` an extra strip kept free at the
+ * bottom for the credits, all in pixels.
+ */
+export function computeLayout(spec, w, h, margin, gutter, foot = 0) {
   const rows = spec.dir === 'rows';
   // Work in "column space" (a = across, b = along); rows swap the axes back at the end.
   const edges = [[[0, 0], [0, 1]], ...spec.cuts.map(([t, b]) => [[t, 0], [b, 1]]), [[1, 0], [1, 1]]];
@@ -160,7 +187,7 @@ export function computeLayout(spec, w, h, margin, gutter) {
       ]);
     }
   }
-  const iw = w - 2 * margin, ih = h - 2 * margin;
+  const iw = w - 2 * margin, ih = h - 2 * margin - foot;
   const toPx = ([a, b]) => (rows ? [margin + b * iw, margin + a * ih] : [margin + a * iw, margin + b * ih]);
   const panels = cells.map((cell) => {
     const poly = insetPolygon(cell.map(toPx), gutter / 2);
@@ -169,7 +196,11 @@ export function computeLayout(spec, w, h, margin, gutter) {
     return { poly, bbox };
   });
   const t = spec.title;
-  return { panels, title: { x: t.x * w, y: t.y * h, w: t.w * w, h: t.h * h, align: t.align } };
+  return {
+    panels,
+    title: { x: t.x * w, y: t.y * h, w: t.w * w, h: t.h * h, align: t.align },
+    foot: { x: margin, y: h - margin - foot, w: iw, h: foot },
+  };
 }
 
 /** True when point (x, y) lies inside polygon `poly`. */

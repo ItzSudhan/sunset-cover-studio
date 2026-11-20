@@ -2,9 +2,9 @@
 // to place a photo in it, drag to pan and scroll (or use the slider) to zoom. Download writes the PNG.
 import { GRADES } from './colorGrade.js';
 import { downloadPng } from './exportPng.js';
-import { SIZES, TEMPLATES, computeLayout, layoutSpec, panelCount, pointInPolygon } from './layouts.js';
-import { clampPanel, defaultPanel, focusCrop, overlap, panelArea, panelFit } from './photoPanels.js';
-import { renderCover } from './renderCover.js';
+import { SIZES, TEMPLATES, layoutSpec, panelCount, pointInPolygon, posterLayout } from './layouts.js';
+import { clampPanel, defaultPanel, focusCrop, overlap, panelArea, panelFit, scoreCrop } from './photoPanels.js';
+import { DEFAULT_CREDITS, renderCover, titleKeepOut } from './renderCover.js';
 import { DEFAULT_FOCUS, SAMPLES, sampleFocus } from './samples.js';
 import { exposeExport, markReady, shotParams, stageExport } from './shots.js';
 
@@ -21,43 +21,64 @@ const state = {
   grade: 'sunset',
   intensity: 1,
   title: 'Sunset\nStreets',
-  tagline: 'Coming this summer',
-  fx: { sun: true, palms: true, grain: true, halftone: true },
+  tagline: 'Coming soon',
+  credits: DEFAULT_CREDITS,
+  fx: { sun: true, palms: false, grain: true, halftone: false },
 };
 let selected = 0;
 let layout = null;
 let queued = false;
 
-/** The panels of the current layout at export size, so crops are worked out at full resolution. */
+/** The poster layout at export size (panels, title, sun and keep-out zones), so crops use full resolution. */
 function exportLayout() {
-  const size = SIZES[state.size], s = Math.min(size.w, size.h);
-  return { size, ...computeLayout(layoutSpec(state.layout, state.size), size.w, size.h, s * 0.024, s * 0.016) };
+  const size = SIZES[state.size];
+  const L = posterLayout(state.layout, state.size, size.w, size.h, state.fx);
+  // Swap the whole title box for the rectangle the caption really covers, so faces can sit beside a short title.
+  const ink = titleKeepOut(state, L, size.w, size.h);
+  if (ink) L.keepOut[0] = ink;
+  return { size, ...L };
 }
 
 /**
- * Deals the photos onto the panels: photos in `state.order` go to panels from the most visible (the hero) to the
- * least, where "visible" is the panel's area minus what the title covers, so the hero never hides under the lettering.
- * Each is cropped tight on its face. With fewer photos than panels they repeat, zoomed closer so no two panels match.
+ * Deals the photos onto the panels: photos in `state.order` go to panels from the most face-friendly (the hero) to
+ * the least, where that is the panel's area minus what the title, sun and palms cover. Each photo gets a face-aware
+ * crop: the hero's face fills a big share of its panel, and every face is kept clear of the title block and sun
+ * disc. With fewer photos than panels they repeat, zoomed closer so no two panels match.
  */
 function autoFill() {
   const n = state.photos.length;
   state.panels = Array.from({ length: 12 }, (_, i) => defaultPanel(i, n));
   if (n <= 1) return;
-  const { size, panels, title } = exportLayout();
-  const visible = (p) => { const o = overlap(p, title); return panelArea(p) * (1 - o.x * o.y); };
+  const { size, panels, keepOut } = exportLayout();
+  const visible = (p) => {
+    let hidden = 0;
+    for (const k of keepOut) { const o = overlap(p, k); hidden += o.x * o.y * (k.weight ?? 1); }
+    return panelArea(p) * Math.max(0.05, 1 - hidden);
+  };
   const rank = panels.map((p, i) => [i, visible(p)]).sort((a, b) => b[1] - a[1]).map(([i]) => i);
+  // Panel by panel (hero first), pick the unused photo whose face fits that panel best, with a mild preference for
+  // the dealing order: a short panel above the title gets a photo with a small face instead of a cut-off close-up.
+  const used = new Set();
   rank.forEach((pi, k) => {
-    const photo = state.photos[state.order[k % n]];
-    const zoom = k === 0 ? 1.08 : k < n ? 1.3 : 1.9;
-    state.panels[pi] = focusCrop(photo, panels[pi], zoom, size.w, size.h, title);
+    let pool = state.order.filter((i) => !used.has(i));
+    if (!pool.length) { used.clear(); pool = [...state.order]; }
+    const face = k === 0 ? 0.38 : k < n ? 0.3 : 0.4;
+    let best = null;
+    pool.forEach((idx, j) => {
+      const r = scoreCrop(state.photos[idx], panels[pi], face, size.w, size.h, keepOut);
+      const cost = r.cost + j * 0.6;
+      if (!best || cost < best.cost) best = { cost, set: r.set, idx };
+    });
+    used.add(best.idx);
+    state.panels[pi] = best.set;
   });
 }
 
-/** Puts photo `i` in panel `pi`, cropped on its face. */
+/** Puts photo `i` in panel `pi`, cropped on its face and clear of the lettering. */
 function placePhoto(i, pi) {
-  const { size, panels, title } = exportLayout();
+  const { size, panels, keepOut } = exportLayout();
   if (!panels[pi]) return;
-  state.panels[pi] = focusCrop(state.photos[i], panels[pi], 1.2, size.w, size.h, title);
+  state.panels[pi] = focusCrop(state.photos[i], panels[pi], 0.3, size.w, size.h, keepOut);
 }
 
 function loadBitmap(src) {
@@ -85,7 +106,7 @@ function shuffle() {
   const o = state.order;
   for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; }
   autoFill();
-  status(`Shuffled: ${state.photos[o[0]].name.replace(/\.\w+$/, '')} is the hero now.`);
+  status('Shuffled: the cast is re-dealt, every face still clear of the title.');
   refreshPanelControls();
   redraw();
 }
@@ -295,6 +316,7 @@ window.addEventListener('drop', (e) => {
 });
 $('title').addEventListener('input', (e) => { state.title = e.target.value; redraw(); });
 $('tagline').addEventListener('input', (e) => { state.tagline = e.target.value; redraw(); });
+$('credits').addEventListener('input', (e) => { state.credits = e.target.value; redraw(); });
 $('intensity').addEventListener('input', (e) => { state.intensity = Number(e.target.value); redraw(); });
 for (const key of Object.keys(state.fx)) {
   $(`fx-${key}`).addEventListener('change', (e) => { state.fx[key] = e.target.checked; redraw(); });
@@ -345,14 +367,16 @@ async function start() {
     img: await loadBitmap(`samples/${n}.jpg`), name: `${n}.jpg`, sample: true, focus: sampleFocus(n),
   }))));
   if (params.shot) {
-    for (const k of ['layout', 'size', 'grade', 'title', 'tagline']) if (params[k] != null) state[k] = params[k];
+    for (const k of ['layout', 'size', 'grade', 'title', 'tagline', 'credits']) if (params[k] != null) state[k] = params[k];
+    if (params.fx != null) for (const k of Object.keys(state.fx)) state.fx[k] = params.fx.includes(k);
   }
   autoFill();
+  $('credits').value = state.credits;
   if (params.shot) {
     if (params.select != null) selected = params.select;
     if (params.crops) params.crops.forEach((c, i) => { if (c) state.panels[i] = c; });
-    if (params.fx != null) for (const k of Object.keys(state.fx)) state.fx[k] = params.fx.includes(k);
     if (params.span) state.panels.forEach((p) => Object.assign(p, { photo: 0, zoom: 1, panX: 0, panY: 0, span: true }));
+    for (const k of Object.keys(state.fx)) $(`fx-${k}`).checked = state.fx[k];
     $('title').value = state.title;
     $('tagline').value = state.tagline;
     exposeExport(state);
