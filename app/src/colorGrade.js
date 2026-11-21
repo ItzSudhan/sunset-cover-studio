@@ -312,7 +312,7 @@ export function drawHalftone(ctx, w, h, cell, amount, panels, color = '#000') {
   const m = mask.getContext('2d');
   for (const { poly, bbox } of panels) {
     const cx = bbox.x + bbox.w / 2, cy = bbox.y + bbox.h * 0.42, r = Math.hypot(bbox.w, bbox.h) / 2;
-    const g = m.createRadialGradient(cx, cy, r * 0.42, cx, cy, r * 1.02);
+    const g = m.createRadialGradient(cx, cy, r * 0.6, cx, cy, r * 1.05);
     g.addColorStop(0, 'rgba(0,0,0,0)');
     g.addColorStop(1, 'rgba(0,0,0,1)');
     m.save();

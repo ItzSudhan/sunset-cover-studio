@@ -18,7 +18,7 @@ export const TEMPLATES = {
     landscape: {
       dir: 'cols', cuts: [[0.25, 0.19], [0.60, 0.54], [0.81, 0.76]],
       sub: [[[0.36, 0.31], [0.68, 0.63]], [], [[0.52, 0.44]], [[0.34, 0.29], [0.67, 0.61]]],
-      title: { x: 0.16, y: 0.565, w: 0.68, h: 0.31, align: 'center' },
+      title: { x: 0.14, y: 0.5, w: 0.72, h: 0.37, align: 'center' },
     },
     square: {
       dir: 'rows', cuts: [[0.28, 0.23], [0.66, 0.60]],
