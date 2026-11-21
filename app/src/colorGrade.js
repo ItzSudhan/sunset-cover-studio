@@ -139,6 +139,97 @@ export function applyGradientMap(ctx, w, h, grade, amount) {
   ctx.putImageData(img, 0, 0);
 }
 
+/**
+ * The "ink & paint" look that turns graded photos into drawn cover art, scaled by `amount` (0..1):
+ *  - cel shading: luminance is pulled into `bands` flat tone steps (with a soft shoulder between steps, and a little
+ *    less on skin) while each pixel keeps its own hue, so faces stay warm and recognisable;
+ *  - ink: a Sobel edge pass over a lightly blurred luminance, thresholded, thickened by a small max filter and painted
+ *    in the grade's darkest ink colour, so contours read as bold pen lines rather than photo detail.
+ * Pure per-pixel loops over typed arrays: fast enough for the live preview and identical in the export.
+ */
+export function applyInk(ctx, w, h, grade, amount, bands = 5) {
+  if (!(amount > 0)) return;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data, n = w * h, s = Math.min(w, h);
+  const lum = new Float32Array(n);
+  for (let p = 0, i = 0; p < n; p++, i += 4) lum[p] = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
+
+  // A separable box blur (radius scales with the poster) so skin pores and grain don't turn into scribbles.
+  const rad = Math.max(1, Math.round(s / 520));
+  const tmp = new Float32Array(n), soft = new Float32Array(n), win = rad * 2 + 1;
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let acc = 0;
+    for (let x = -rad; x <= rad; x++) acc += lum[row + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = acc / win;
+      acc += lum[row + Math.min(w - 1, x + rad + 1)] - lum[row + Math.max(0, x - rad)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let y = -rad; y <= rad; y++) acc += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      soft[y * w + x] = acc / win;
+      acc += tmp[Math.min(h - 1, y + rad + 1) * w + x] - tmp[Math.max(0, y - rad) * w + x];
+    }
+  }
+
+  // Sobel magnitude -> ink coverage (0..1) with a soft threshold.
+  const edge = new Float32Array(n);
+  const lo = 0.2, hi = 0.42;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x;
+      const a = soft[p - w - 1], b = soft[p - w], c = soft[p - w + 1];
+      const l = soft[p - 1], r = soft[p + 1];
+      const e = soft[p + w - 1], f = soft[p + w], g = soft[p + w + 1];
+      const gx = c + 2 * r + g - a - 2 * l - e, gy = e + 2 * f + g - a - 2 * b - c;
+      const m = Math.sqrt(gx * gx + gy * gy);
+      const t = (m - lo) / (hi - lo);
+      edge[p] = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+    }
+  }
+  // Thicken: a separable max filter, so lines read as bold pen strokes at poster size.
+  const thick = Math.max(1, Math.round(s / 900));
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      let m = 0;
+      for (let k = -thick; k <= thick; k++) { const v = edge[row + Math.min(w - 1, Math.max(0, x + k))]; if (v > m) m = v; }
+      tmp[row + x] = m;
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      let m = 0;
+      for (let k = -thick; k <= thick; k++) { const v = tmp[Math.min(h - 1, Math.max(0, y + k)) * w + x]; if (v > m) m = v; }
+      edge[y * w + x] = m;
+    }
+  }
+
+  const ink = hexRgb(grade.extrude?.[1] ?? '#100418');
+  const inkA = 0.92 * amount;
+  for (let p = 0, i = 0; p < n; p++, i += 4) {
+    let r = d[i], g = d[i + 1], b = d[i + 2];
+    // Cel bands: snap the (blurred) luminance to a step, with a smooth shoulder so edges don't stair-step.
+    const l0 = soft[p], t = l0 * bands, k = Math.floor(t), f = t - k;
+    const sf = f < 0.3 ? 0 : f > 0.7 ? 1 : ((f - 0.3) / 0.4) * ((f - 0.3) / 0.4) * (3 - 2 * ((f - 0.3) / 0.4));
+    const lq = Math.min(1, (k + sf) / bands + 0.5 / bands * 0.6);
+    let skin = 0;
+    if (r > g && g > b && r - b > 28) { skin = 1 - Math.abs((g - b) / (r - b) - 0.45) / 0.3; if (skin < 0) skin = 0; }
+    const flat = amount * (0.85 - skin * 0.3);
+    // Paint the flat tone: replace the pixel's own luminance (and fine detail) with the band's, keeping its hue.
+    const shift = (lq - lum[p]) * 255 * flat;
+    r += shift; g += shift; b += shift;
+    const a = edge[p] * inkA;
+    d[i] = r + (ink[0] - r) * a;
+    d[i + 1] = g + (ink[1] - g) * a;
+    d[i + 2] = b + (ink[2] - b) * a;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 /** Highlight glow: a blurred, high-contrast copy of `source` (so mostly its bright parts) screened over the canvas. */
 export function drawBloom(ctx, source, w, h, strength) {
   ctx.save();

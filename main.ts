@@ -3,7 +3,8 @@
 // The app is this directory's app/ folder: plain static files a desktop browser loads offline (app/index.html and
 // its ES modules, no library, no font file and no network request). It turns your own photos and a caption into a
 // crime-epic style multi-panel poster: slanted panels with crisp black gutters, a film-style grade that keeps skin
-// readable under a bold sunset / neon gradient map (glow, grain, comic halftone dots that fade away from faces, palm
+// readable under a bold sunset / neon gradient map, an "ink & paint" pass (cel-shaded tone bands and bold Sobel ink
+// outlines, so the panels read as drawn art) and glow, grain, comic halftone dots that fade away from faces, palm
 // silhouettes), face-aware auto-crops that keep every face clear of the title and sun, hand-drawn chrome lettering
 // with a thick outline, extrusion, drop shadow and a tagline strap, and a credits block, exported as a PNG in 1920x1080, 1080x1080 or 1080x1350. This program hands it in: it copies app/ and screenshots/ from beside this file
 // to /output and writes /output/dossier.json, the summary the judge reads, with the vendored make.fun library.

@@ -1,6 +1,6 @@
 // Composes the poster onto a canvas at the canvas's own size. The live preview and the exported PNG both come from
 // this one function, so what you see is what you download.
-import { GRADES, applyGradientMap, drawBloom, drawGrain, drawHalftone, drawLightLeak, drawPalms, drawSun, drawVignette } from './colorGrade.js';
+import { GRADES, applyGradientMap, applyInk, drawBloom, drawGrain, drawHalftone, drawLightLeak, drawPalms, drawSun, drawVignette } from './colorGrade.js';
 import { posterLayout } from './layouts.js';
 import { drawTitle } from './lettering.js';
 import { defaultPanel, drawPanelFrames, drawPanelPhoto } from './photoPanels.js';
@@ -122,6 +122,8 @@ export function renderCover(canvas, state) {
     drawPanelPhoto(lc, state.photos[set.photo]?.img ?? state.photos[0]?.img, panel, set, w, h);
   });
   applyGradientMap(lc, w, h, grade, state.intensity ?? 1);
+  // Ink & paint: cel-shaded tone bands and bold Sobel ink lines, so the panels read as drawn art, not photos.
+  applyInk(lc, w, h, grade, state.ink ?? 0.85);
 
   // 2. Glow, sun and light leak over the graded photos.
   const ctx = canvas.getContext('2d');

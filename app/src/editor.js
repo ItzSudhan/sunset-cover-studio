@@ -20,6 +20,7 @@ const state = {
   size: 'landscape',
   grade: 'sunset',
   intensity: 1,
+  ink: 0.85,
   title: 'Last\nResort',
   tagline: "Everybody's got a price",
   credits: DEFAULT_CREDITS,
@@ -318,6 +319,7 @@ $('title').addEventListener('input', (e) => { state.title = e.target.value; redr
 $('tagline').addEventListener('input', (e) => { state.tagline = e.target.value; redraw(); });
 $('credits').addEventListener('input', (e) => { state.credits = e.target.value; redraw(); });
 $('intensity').addEventListener('input', (e) => { state.intensity = Number(e.target.value); redraw(); });
+$('ink').addEventListener('input', (e) => { state.ink = Number(e.target.value); redraw(); });
 for (const key of Object.keys(state.fx)) {
   $(`fx-${key}`).addEventListener('change', (e) => { state.fx[key] = e.target.checked; redraw(); });
 }
