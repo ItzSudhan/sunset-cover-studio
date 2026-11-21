@@ -20,10 +20,10 @@ const state = {
   size: 'landscape',
   grade: 'sunset',
   intensity: 1,
-  title: 'Sunset\nStreets',
-  tagline: 'Coming soon',
+  title: 'Last\nResort',
+  tagline: "Everybody's got a price",
   credits: DEFAULT_CREDITS,
-  fx: { sun: true, palms: false, grain: true, halftone: false },
+  fx: { sun: true, palms: true, grain: true, halftone: true },
 };
 let selected = 0;
 let layout = null;

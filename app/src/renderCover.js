@@ -38,9 +38,9 @@ function drawCredits(ctx, text, foot, s, grade) {
 /** Title and tagline lettering styles for a grade. */
 function titleStyle(grade) {
   return {
-    weight: 1.75, track: 0.5, skew: 0.17, lead: 1.4, fill: grade.fill,
-    outline: grade.outline, outlineW: 0.62, ring: grade.ring, ringW: 0.2,
-    extrude: grade.extrude, depth: [0.55, 1.15], shadow: 'rgba(0,0,0,0.7)', glow: grade.glow,
+    weight: 1.85, track: 0.45, skew: 0.2, lead: 1.35, fill: grade.fill,
+    outline: grade.outline, outlineW: 0.8, ring: grade.ring, ringW: 0.22,
+    extrude: grade.extrude, depth: [0.7, 1.4], shadow: 'rgba(0,0,0,0.85)', glow: grade.glow,
   };
 }
 
@@ -133,7 +133,7 @@ export function renderCover(canvas, state) {
   const t = layout.title;
   // The sun sits right behind the lettering (auto-fill keeps faces out of its disc), so it frames the title.
   if (state.fx.sun) drawSun(ctx, layout.sun.cx, layout.sun.cy, layout.sun.r, grade);
-  if (state.fx.halftone) drawHalftone(ctx, w, h, Math.max(4, s * 0.0085), 0.3);
+  if (state.fx.halftone) drawHalftone(ctx, w, h, Math.max(5, s * 0.011), 0.85, layout.panels, grade.extrude[1]);
 
   // 3. Frames, palms, vignette, then the credits strip along the bottom.
   drawPanelFrames(ctx, layout.panels, grade, s);

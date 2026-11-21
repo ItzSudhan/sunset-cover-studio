@@ -12,33 +12,34 @@ export const GRADES = {
   sunset: {
     name: 'Sunset Strip',
     map: ['#14042a', '#4d0f5c', '#b8226a', '#ff6a3d', '#ffc56b', '#fff3d1'],
-    strength: 0.34, contrast: 1.12, shadowTint: '#0f5a6e', highTint: '#ffa04a', split: 0.3, sat: 1.12, skin: 0.7,
-    bg: '#10031c', border: '#ffe7c2', glow: 'rgba(255,120,60,0.55)',
-    leak: ['rgba(255,170,60,0.38)', 'rgba(255,40,120,0)'],
+    strength: 0.46, contrast: 1.16, shadowTint: '#3a0f7a', highTint: '#ff8a3a', split: 0.4, sat: 1.32, skin: 0.66,
+    bg: '#10031c', border: '#ffe7c2', glow: 'rgba(255,90,80,0.6)',
+    leak: ['rgba(255,150,50,0.44)', 'rgba(255,40,120,0)'],
     sun: ['#fff4a3', '#ffb03a', '#ff3d7f'],
-    fill: [[0, '#fffbe2'], [0.38, '#ffe066'], [0.49, '#ff9d1f'], [0.5, '#ff2f86'], [0.78, '#c21fbf'], [1, '#6a14c9']],
-    outline: '#170420', ring: '#fff1d6', extrude: ['#a3165e', '#2a0430'], palm: '#16031f',
+    // Chrome: a white-hot top, a dark horizon band at the middle, then a sunset reflection below it.
+    fill: [[0, '#ffffff'], [0.22, '#fff3cf'], [0.44, '#ffbe55'], [0.47, '#7a2a12'], [0.5, '#2a0838'], [0.56, '#ff3d7f'], [0.8, '#ff8f3a'], [1, '#ffe37a']],
+    outline: '#12021a', ring: '#fff6e0', extrude: ['#8a1450', '#1a0220'], palm: '#16031f',
     tagFill: '#ffffff', tagPlate: 'rgba(18,4,30,0.86)', accent: '#ff3d7f',
   },
   neon: {
     name: 'Neon Night',
     map: ['#04021a', '#1b0a52', '#5c16a8', '#e1249c', '#ff8ad6', '#b8fbff'],
-    strength: 0.42, contrast: 1.16, shadowTint: '#1a2a8c', highTint: '#ff7ad0', split: 0.34, sat: 1.15, skin: 0.6,
+    strength: 0.5, contrast: 1.18, shadowTint: '#2a1a9c', highTint: '#ff6ad0', split: 0.4, sat: 1.32, skin: 0.6,
     bg: '#05021a', border: '#9ff6ff', glow: 'rgba(255,40,200,0.55)',
     leak: ['rgba(80,220,255,0.30)', 'rgba(200,30,255,0)'],
     sun: ['#ffd6ff', '#ff4fd8', '#7a2bff'],
-    fill: [[0, '#f0ffff'], [0.38, '#7ff6ff'], [0.49, '#1ec8ff'], [0.5, '#ff3ccf'], [0.8, '#a61fe0'], [1, '#4b10b8']],
+    fill: [[0, '#ffffff'], [0.3, '#c8fbff'], [0.45, '#5fe4ff'], [0.48, '#0b1a4a'], [0.52, '#20063a'], [0.58, '#ff3ccf'], [0.82, '#ff8ae0'], [1, '#ffe0fa']],
     outline: '#06021c', ring: '#e8fdff', extrude: ['#5a1aa8', '#0c0330'], palm: '#05021a',
     tagFill: '#ffffff', tagPlate: 'rgba(6,2,28,0.86)', accent: '#1ec8ff',
   },
   miami: {
     name: 'Miami Teal',
     map: ['#032029', '#0a4f60', '#14999c', '#ff7a98', '#ffc79c', '#fff7ea'],
-    strength: 0.3, contrast: 1.12, shadowTint: '#00807e', highTint: '#ff9a7a', split: 0.36, sat: 1.1, skin: 0.7,
+    strength: 0.42, contrast: 1.14, shadowTint: '#00807e', highTint: '#ff7a9a', split: 0.4, sat: 1.28, skin: 0.66,
     bg: '#031a22', border: '#fff2e2', glow: 'rgba(255,140,160,0.5)',
     leak: ['rgba(255,190,150,0.32)', 'rgba(20,200,200,0)'],
     sun: ['#fff6d8', '#ffab8a', '#ff5f8f'],
-    fill: [[0, '#fffaf2'], [0.38, '#ffd0b0'], [0.49, '#ff8fa6'], [0.5, '#25d6cf'], [0.8, '#0f9aa6'], [1, '#08606e']],
+    fill: [[0, '#ffffff'], [0.3, '#ffe6ee'], [0.45, '#ff8fb0'], [0.48, '#3a0a2a'], [0.52, '#062a34'], [0.58, '#25d6cf'], [0.82, '#9ff4ea'], [1, '#ffffff']],
     outline: '#03161e', ring: '#fff5ea', extrude: ['#0d6b78', '#021820'], palm: '#02161d',
     tagFill: '#ffffff', tagPlate: 'rgba(3,22,30,0.86)', accent: '#ff7a98',
   },
@@ -289,21 +290,46 @@ export function drawGrain(ctx, w, h, amount, scale = 1) {
   ctx.restore();
 }
 
-/** A diagonal halftone dot screen, multiplied into the shadows. `cell` is the dot spacing in pixels. */
-export function drawHalftone(ctx, w, h, cell, amount) {
+/**
+ * A comic-print halftone: a diagonal screen of dots in `color` (spacing `cell` px), multiplied into each panel. Every
+ * panel gets its own mask, clear in the middle (where the face sits) and dense towards its edges and corners, so the
+ * dots read as print texture without speckling anyone's face.
+ */
+export function drawHalftone(ctx, w, h, cell, amount, panels, color = '#000') {
   const tile = new OffscreenCanvas(Math.ceil(cell), Math.ceil(cell));
   const t = tile.getContext('2d');
-  t.fillStyle = '#000';
+  t.fillStyle = color;
   t.beginPath();
-  t.arc(cell / 2, cell / 2, cell * 0.3, 0, Math.PI * 2);
+  t.arc(cell / 2, cell / 2, cell * 0.36, 0, Math.PI * 2);
   t.fill();
-  ctx.save();
-  ctx.globalCompositeOperation = 'soft-light';
-  ctx.globalAlpha = amount;
-  const p = ctx.createPattern(tile, 'repeat');
+  const dots = new OffscreenCanvas(w, h);
+  const d = dots.getContext('2d');
+  const p = d.createPattern(tile, 'repeat');
   p.setTransform(new DOMMatrix().rotate(45));
-  ctx.fillStyle = p;
-  ctx.fillRect(0, 0, w, h);
+  d.fillStyle = p;
+  d.fillRect(0, 0, w, h);
+  const mask = new OffscreenCanvas(w, h);
+  const m = mask.getContext('2d');
+  for (const { poly, bbox } of panels) {
+    const cx = bbox.x + bbox.w / 2, cy = bbox.y + bbox.h * 0.42, r = Math.hypot(bbox.w, bbox.h) / 2;
+    const g = m.createRadialGradient(cx, cy, r * 0.42, cx, cy, r * 1.02);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,1)');
+    m.save();
+    m.beginPath();
+    poly.forEach(([x, y], i) => (i ? m.lineTo(x, y) : m.moveTo(x, y)));
+    m.closePath();
+    m.clip();
+    m.fillStyle = g;
+    m.fillRect(bbox.x, bbox.y, bbox.w, bbox.h);
+    m.restore();
+  }
+  d.globalCompositeOperation = 'destination-in';
+  d.drawImage(mask, 0, 0);
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.globalAlpha = amount;
+  ctx.drawImage(dots, 0, 0);
   ctx.restore();
 }
 
